@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as lg
 from imageio import imread, imsave
 import scipy.stats as stats
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 # import h5py
 normpdf = stats.norm.pdf
 
@@ -24,9 +24,10 @@ def imwrite(im, filename):
 orifolder = '../ori'
 datafolder = '../data'
 resfolder = '../result'
-samples = {'1': 0.8, '2': 0.4, '3': 0.6}
+restoreRatio = 0
+samples = {'A': 0.8, 'B': 0.4, 'C': 0.6}
 for testName, noiseRatio in samples.items():
-    Img = im2double(imread('{}/{}.png'.format(orifolder, testName)))
+    # Img = im2double(imread('{}/{}.png'.format(orifolder, testName)))
     corrImg = im2double(imread('{}/{}.png'.format(datafolder, testName)))
     if len(corrImg.shape) == 2:
         # only black-white images
@@ -42,6 +43,7 @@ for testName, noiseRatio in samples.items():
 
     basisNum = 50   # number of basis functions
     sigma = 0.01    # standard deviation
+    lmda = 0.001    # lambda value to regularize weights
     # mean value of each basis function
     Phi_mu = np.linspace(1, cols, basisNum)/cols
     # set the standard deviation to the same value for brevity
@@ -49,6 +51,7 @@ for testName, noiseRatio in samples.items():
     X = np.linspace(0, 1, num=cols)
     Phi = [[(np.exp(- (X[n] - Phi_mu[m]) ** 2) / (2 * Phi_sigma[m] ** 2)) for m in range(basisNum)] for n in range(cols)]
     Phi = np.array(Phi)
+    lmda_I = lmda * np.eye(basisNum, dtype='double')
     resImg = np.copy(corrImg)
 
     for ch in range(channels):
@@ -60,7 +63,7 @@ for testName, noiseRatio in samples.items():
             n_cols = np.nonzero(noiseMask[r, :, ch] == 0)[0]
             Phi_p = Phi[p_cols]
             Phi_n = Phi[n_cols]
-            TransCoe = lg.pinv(Phi_p.transpose().dot(Phi_p)).dot(Phi_p.transpose())
+            TransCoe = lg.pinv(Phi_p.transpose().dot(Phi_p) + lmda_I).dot(Phi_p.transpose())
 
             # restore the missing pixels
             t_p = resImg[r, :, ch][p_cols]
@@ -70,25 +73,25 @@ for testName, noiseRatio in samples.items():
                 resImg[r, n_cols[c], ch] = t_n[c]
 
     # show the restored image
-    if resImg.shape[2] == 1:
-        Img = Img.squeeze()
-        corrImg = corrImg.squeeze()
-        resImg = resImg.squeeze()
-        plt.subplot(1, 3, 1)
-        plt.imshow(Img, cmap='gray')
-        plt.subplot(1, 3, 2)
-        plt.imshow(corrImg, cmap='gray')
-        plt.subplot(1, 3, 3)
-        plt.imshow(resImg, cmap='gray')
-        plt.show()
-    else:
-        plt.subplot(1, 3, 1)
-        plt.imshow(Img)
-        plt.subplot(1, 3, 2)
-        plt.imshow(corrImg)
-        plt.subplot(1, 3, 3)
-        plt.imshow(resImg)
-        plt.show()
+    # if resImg.shape[2] == 1:
+    #     Img = Img.squeeze()
+    #     corrImg = corrImg.squeeze()
+    #     resImg = resImg.squeeze()
+    #     plt.subplot(1, 3, 1)
+    #     plt.imshow(Img, cmap='gray')
+    #     plt.subplot(1, 3, 2)
+    #     plt.imshow(corrImg, cmap='gray')
+    #     plt.subplot(1, 3, 3)
+    #     plt.imshow(resImg, cmap='gray')
+    #     plt.show()
+    # else:
+    #     plt.subplot(1, 3, 1)
+    #     plt.imshow(Img)
+    #     plt.subplot(1, 3, 2)
+    #     plt.imshow(corrImg)
+    #     plt.subplot(1, 3, 3)
+    #     plt.imshow(resImg)
+    #     plt.show()
 
     # prefix = '%s/%s_%.1f_%d'%(resfolder, testName, noiseRatio, basisNum)
     # fileName = prefix+'_result.h5'
@@ -106,14 +109,19 @@ for testName, noiseRatio in samples.items():
     # h5f.close()
 
     # compute error
-    im1 = Img.flatten()
-    im2 = corrImg.flatten()
-    im3 = resImg.flatten()
-    print((
-        '{}({}):\n'
-        'Distance between original and corrupted: {}\n'
-        'Distance between original and reconstructed (regression): {}'
-    ).format(testName, noiseRatio, lg.norm(im1-im2, 2), lg.norm(im1-im3, 2)))
+    # im1 = Img.flatten()
+    # im2 = corrImg.flatten()
+    # im3 = resImg.flatten()
+    # norm12 = lg.norm(im1-im2, 2)
+    # norm13 = lg.norm(im1-im3, 2)
+    # print((
+    #     '{}({}):\n'
+    #     'Distance between original and corrupted: {}\n'
+    #     'Distance between original and reconstructed (regression): {}'
+    #     'Restore ratio: {}\n'
+    # ).format(testName, noiseRatio, norm12, norm13, norm13/norm12))
+    # restoreRatio += norm13/norm12
 
     # store figure
     imwrite(resImg, '{}/{}.png'.format(resfolder, testName))
+# print('Average Restore Ratio:', restoreRatio/3)
